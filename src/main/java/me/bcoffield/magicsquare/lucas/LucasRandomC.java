@@ -8,6 +8,9 @@ import java.util.List;
 import java.util.Random;
 
 public class LucasRandomC {
+  /**
+   * This looks like a 16yo coded this method. And I apologize. Refactor later...
+   */
   public void run() {
     boolean found = false;
     while (!found) {
