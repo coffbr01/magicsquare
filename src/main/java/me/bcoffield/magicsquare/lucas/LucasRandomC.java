@@ -2,19 +2,26 @@ package me.bcoffield.magicsquare.lucas;
 
 import me.bcoffield.magicsquare.domain.MagicSquare;
 
+import java.sql.*;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class LucasRandomC {
-  /**
-   * This looks like a 16yo coded this method. And I apologize. Refactor later...
-   */
+  private Connection conn;
+  private static final AtomicInteger atomicC = new AtomicInteger(1);
+  private static long lastLogTime = System.currentTimeMillis();
+
+  /** This looks like a 16yo coded this method. And I apologize. Refactor later... */
   public void run() {
+    createConnection();
+    setInitialC();
+
     boolean found = false;
     while (!found) {
-      int c = Math.max(1, Math.abs(new Random().nextInt()));
+      int c = atomicC.getAndAdd(1);
       long cSquared = (long) c * c;
 
       LucasCandidates candidates = getCandidates(c, cSquared);
@@ -57,6 +64,7 @@ public class LucasRandomC {
               MagicSquare magicSquare = new MagicSquare(longs.stream().mapToLong(l -> l).toArray());
               if (magicSquare.isValid()) {
                 found = true;
+                markCSuccess(c, true);
                 System.out.println(magicSquare);
               } else {
                 System.err.println("Something went wrong");
@@ -67,8 +75,67 @@ public class LucasRandomC {
         }
       }
       if (!found) {
-        System.out.println("No solution found for c=" + c);
+        if (c % 10000 == 0) {
+          System.out.println("No solution found through c=" + NumberFormat.getInstance().format(c) + " (took " + (System.currentTimeMillis() - lastLogTime) + "ms)");
+          lastLogTime = System.currentTimeMillis();
+        }
+        markCSuccess(c, false);
       }
+    }
+  }
+
+  private void setInitialC() {
+    Statement stmt;
+    try {
+      stmt = conn.createStatement();
+      String sql = "SELECT MAX(ID) FROM C;";
+      ResultSet resultSet = stmt.executeQuery(sql);
+      if (resultSet.next()) {
+        atomicC.set(resultSet.getInt(1) + 1);
+      }
+      stmt.close();
+    } catch (Exception e) {
+      System.err.println(e.getClass().getName() + ": " + e.getMessage());
+      System.exit(0);
+    }
+  }
+
+  private void markCSuccess(int c, boolean success) {
+    reconnectIfNecessary();
+    Statement stmt;
+    try {
+      stmt = conn.createStatement();
+      String sql =
+          "INSERT INTO C (ID, SUCCESS) VALUES (" + c + ", " + (success ? "TRUE" : "FALSE") + ");";
+      stmt.executeUpdate(sql);
+      stmt.close();
+    } catch (Exception e) {
+      System.err.println(e.getClass().getName() + ": " + e.getMessage());
+      System.exit(0);
+    }
+  }
+
+  private void reconnectIfNecessary() {
+    try {
+      if (conn.isClosed()) {
+        createConnection();
+      }
+    } catch (SQLException e) {
+      System.err.println(e.getClass().getName() + ": " + e.getMessage());
+      System.exit(0);
+    }
+  }
+
+  private void createConnection() {
+    try {
+      Class.forName("org.postgresql.Driver");
+      conn =
+          DriverManager.getConnection(
+              "jdbc:postgresql://localhost:5432/magicsquare", "magicsquare", "password");
+      System.out.println("Opened database successfully");
+    } catch (Exception e) {
+      System.err.println(e.getClass().getName() + ": " + e.getMessage());
+      System.exit(0);
     }
   }
 
