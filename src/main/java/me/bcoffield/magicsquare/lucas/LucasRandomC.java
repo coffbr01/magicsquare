@@ -67,7 +67,7 @@ public class LucasRandomC {
         }
       }
       if (!found) {
-        System.out.println("Failure for c=" + c);
+        System.out.println("No solution found for c=" + c);
       }
     }
   }
